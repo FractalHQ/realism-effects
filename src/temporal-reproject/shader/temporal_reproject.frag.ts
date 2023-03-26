@@ -1,4 +1,4 @@
-﻿varying vec2 vUv;
+﻿export default /* glsl */`varying vec2 vUv;
 
 uniform sampler2D velocityTexture;
 
@@ -185,4 +185,4 @@ void main() {
 #ifdef useCustomComposeShader
     customComposeShader
 #endif
-}
+}`

@@ -1,4 +1,4 @@
-vec4 velocityTexel;
+export default /* glsl */`vec4 velocityTexel;
 float dilatedDepth;
 vec2 dilatedUvOffset;
 int texIndex;
@@ -311,4 +311,4 @@ vec3 Decode(vec2 f) {
     n.x += n.x >= 0.0 ? -t : t;
     n.y += n.y >= 0.0 ? -t : t;
     return normalize(n);
-}
+}`

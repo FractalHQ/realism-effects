@@ -1,4 +1,6 @@
-﻿#if !defined(diffuseOnly) && !defined(specularOnly)
+﻿export default /* glsl */ String.raw`
+
+#if !defined(diffuseOnly) && !defined(specularOnly)
 layout(location = 0) out vec4 gDiffuse;
 layout(location = 1) out vec4 gSpecular;
 #else
@@ -491,3 +493,4 @@ float fastGetViewZ(const float depth) {
     return depth * nearMinusFar - cameraNear;
 #endif
 }
+`.trim()

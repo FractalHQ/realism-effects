@@ -1,32 +1,44 @@
-import { Pass } from "postprocessing"
+import type { Texture, WebGLRenderer } from 'three'
+
+import basicVertexShader from '../../utils/shader/basic.vert.js'
+import { Pass } from 'postprocessing'
 import {
-	ClampToEdgeWrapping,
-	DataTexture,
 	EquirectangularReflectionMapping,
-	FloatType,
 	LinearMipMapLinearFilter,
+	ClampToEdgeWrapping,
+	WebGLRenderTarget,
+	ShaderMaterial,
+	DataTexture,
 	NoBlending,
 	RGBAFormat,
-	ShaderMaterial,
-	WebGLRenderTarget
-} from "three"
-import basicVertexShader from "../../utils/shader/basic.vert"
+	FloatType,
+} from 'three'
 
 export class CubeToEquirectEnvPass extends Pass {
+	renderTarget: WebGLRenderTarget
+
+	_fullscreenMaterial: ShaderMaterial
+	set fullscreenMaterial(arg: ShaderMaterial) {
+		this._fullscreenMaterial = arg
+	}
+	get fullscreenMaterial(): ShaderMaterial {
+		return this._fullscreenMaterial
+	}
+
 	constructor() {
-		super("CubeToEquirectEnvPass")
+		super('CubeToEquirectEnvPass')
 
 		this.renderTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false, type: FloatType })
 
-		this.fullscreenMaterial = new ShaderMaterial({
+		this._fullscreenMaterial = new ShaderMaterial({
 			fragmentShader: /* glsl */ `
-            varying vec2 vUv;
+			varying vec2 vUv;
 			uniform samplerCube cubeMap;
 
 			#define M_PI 3.1415926535897932384626433832795
 			
 			// source: https://github.com/spite/CubemapToEquirectangular/blob/master/src/CubemapToEquirectangular.js
-            void main() {
+			void main() {
 				float longitude = vUv.x * 2. * M_PI - M_PI + M_PI / 2.;
 				float latitude = vUv.y * M_PI;
 
@@ -39,16 +51,16 @@ export class CubeToEquirectEnvPass extends Pass {
 				dir.y = -dir.y;
 
 				gl_FragColor = textureCube( cubeMap, dir );
-            }
-            `,
+			}
+			`.trim(),
 			vertexShader: basicVertexShader,
 			uniforms: {
-				cubeMap: { value: null }
+				cubeMap: { value: null },
 			},
 			blending: NoBlending,
 			depthWrite: false,
 			depthTest: false,
-			toneMapped: false
+			toneMapped: false,
 		})
 	}
 
@@ -56,8 +68,14 @@ export class CubeToEquirectEnvPass extends Pass {
 		this.renderTarget.dispose()
 	}
 
-	generateEquirectEnvMap(renderer, cubeMap, width = null, height = null, maxWidth = 4096) {
-		if (width === null && height === null) {
+	generateEquirectEnvMap(
+		renderer: WebGLRenderer,
+		cubeMap: Texture,
+		width = NaN,
+		height = NaN,
+		maxWidth = 4096,
+	) {
+		if (isNaN(width) && isNaN(height)) {
 			const w = cubeMap.source.data[0].width
 			const widthEquirect = 2 ** Math.ceil(Math.log2(2 * w * 3 ** 0.5))
 			const heightEquirect = 2 ** Math.ceil(Math.log2(w * 3 ** 0.5))

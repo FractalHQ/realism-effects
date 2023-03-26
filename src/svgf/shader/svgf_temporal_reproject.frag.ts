@@ -1,4 +1,4 @@
-﻿vec4 moment;
+﻿export default /* glsl */ `vec4 moment;
 
 if (!reset && reprojectedUvDiffuse.x >= 0.0) {
     vec4 historyMoment = sampleReprojectedTexture(lastMomentTexture, reprojectedUvDiffuse, didMove ? SAMPLING_BLOCKY : SAMPLING_CATMULL_ROM);
@@ -17,7 +17,7 @@ if (!reset && reprojectedUvDiffuse.x >= 0.0) {
 
     gMoment = moment;
     return;
-}
+}`
 
 // if (reprojectedUvDiffuse.x < 0. && dot(inputTexel[0].rgb, inputTexel[0].rgb) != 0.0) {
 //     gOutput0.rgb = vec3(0., 1., 0.);

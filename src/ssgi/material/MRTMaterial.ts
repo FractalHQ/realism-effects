@@ -1,16 +1,27 @@
-﻿import { Color, GLSL3, Matrix3, ShaderMaterial, TangentSpaceNormalMap, Uniform, Vector2 } from "three"
+﻿import {
+	TangentSpaceNormalMap,
+	ShaderMaterial,
+	Uniform,
+	Vector2,
+	Matrix3,
+	Color,
+	GLSL3,
+} from 'three'
 
 // will render normals to RGB channel of "gNormal" buffer, roughness to A channel of "gNormal" buffer, depth to RGBA channel of "gDepth" buffer
 // and velocity to "gVelocity" buffer
 
 export class MRTMaterial extends ShaderMaterial {
+	normalMapType: typeof TangentSpaceNormalMap
+	normalScale: Vector2
 	constructor() {
 		super({
-			type: "MRTMaterial",
+			// @ts-expect-error ??
+			type: 'MRTMaterial',
 
 			defines: {
-				USE_UV: "",
-				TEMPORAL_RESOLVE: ""
+				USE_UV: '',
+				TEMPORAL_RESOLVE: '',
 			},
 
 			uniforms: {
@@ -31,7 +42,7 @@ export class MRTMaterial extends ShaderMaterial {
 				blueNoiseTexture: new Uniform(null),
 				blueNoiseRepeat: new Uniform(new Vector2(1, 1)),
 				texSize: new Uniform(new Vector2(1, 1)),
-				frame: new Uniform(0)
+				frame: new Uniform(0),
 			},
 			vertexShader: /* glsl */ `
                 varying vec2 vHighPrecisionZW;
@@ -229,9 +240,10 @@ export class MRTMaterial extends ShaderMaterial {
             `,
 			glslVersion: GLSL3,
 			toneMapped: false,
-			alphaTest: false,
+			// alphaTest: false, // todo - ??
+			alphaTest: 0,
 			fog: false,
-			lights: false
+			lights: false,
 		})
 
 		this.normalMapType = TangentSpaceNormalMap

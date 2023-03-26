@@ -1,9 +1,26 @@
 // source: https://github.com/gkjohnson/three-gpu-pathtracer/blob/main/src/uniforms/EquirectHdrInfoUniform.js
+import type { Texture } from 'three'
 
-import { Source } from "three"
-import { DataTexture, FloatType, LinearFilter, RedFormat, RepeatWrapping, RGBAFormat, Vector2 } from "three"
+import { Source } from 'three'
+import {
+	DataTexture,
+	FloatType,
+	LinearFilter,
+	RedFormat,
+	RepeatWrapping,
+	RGBAFormat,
+	Vector2,
+} from 'three'
 
-const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }) => {
+interface Data {
+	width: number
+	height: number
+	isFloatType: boolean
+	flipY: boolean
+	data: Float32Array
+}
+
+const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }: { data: Data }) => {
 	// from: https://github.com/mrdoob/three.js/blob/dev/src/extras/DataUtils.js
 
 	// importing modules doesn't seem to work for workers that were generated through createObjectURL() for some reason
@@ -113,22 +130,28 @@ const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }) 
 			shiftTable: shiftTable,
 			mantissaTable: mantissaTable,
 			exponentTable: exponentTable,
-			offsetTable: offsetTable
+			offsetTable: offsetTable,
 		}
 	}
 
-	function fromHalfFloat(val) {
+	function fromHalfFloat(val: number) {
 		const m = val >> 10
-		_tables.uint32View[0] = _tables.mantissaTable[_tables.offsetTable[m] + (val & 0x3ff)] + _tables.exponentTable[m]
+		_tables.uint32View[0] =
+			_tables.mantissaTable[_tables.offsetTable[m] + (val & 0x3ff)] + _tables.exponentTable[m]
 		return _tables.floatView[0]
 	}
 
-	function colorToLuminance(r, g, b) {
+	function colorToLuminance(r: number, g: number, b: number) {
 		// https://en.wikipedia.org/wiki/Relative_luminance
 		return 0.2126 * r + 0.7152 * g + 0.0722 * b
 	}
 
-	const binarySearchFindClosestIndexOf = (array, targetValue, offset = 0, count = array.length) => {
+	const binarySearchFindClosestIndexOf = (
+		array: Float32Array,
+		targetValue: number,
+		offset = 0,
+		count = array.length,
+	) => {
 		let lower = offset
 		let upper = offset + count - 1
 
@@ -147,7 +170,14 @@ const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }) 
 		return lower - offset
 	}
 
-	const gatherData = (data, width, height, flipY, marginalDataArray, conditionalDataArray) => {
+	const gatherData = (
+		data: Float32Array,
+		width: number,
+		height: number,
+		flipY: boolean,
+		marginalDataArray: Float32Array,
+		conditionalDataArray: Float32Array,
+	) => {
 		// "conditional" = "pixel relative to row pixels sum"
 		// "marginal" = "row relative to row sum"
 
@@ -259,7 +289,14 @@ const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }) 
 	const marginalDataArray = new Float32Array(height)
 	const conditionalDataArray = new Float32Array(width * height)
 
-	const totalSumValue = gatherData(data, width, height, flipY, marginalDataArray, conditionalDataArray)
+	const totalSumValue = gatherData(
+		data,
+		width,
+		height,
+		flipY,
+		marginalDataArray,
+		conditionalDataArray,
+	)
 
 	if (isFloatType) {
 		postMessage({ totalSumValue, marginalDataArray, conditionalDataArray })
@@ -268,10 +305,21 @@ const workerOnMessage = ({ data: { width, height, isFloatType, flipY, data } }) 
 	}
 }
 
-const blob = new Blob(["onmessage = " + workerOnMessage], { type: "application/javascript" })
+const blob = new Blob(['onmessage = ' + workerOnMessage], { type: 'application/javascript' })
 const workerUrl = URL.createObjectURL(blob)
 
 export class EquirectHdrInfoUniform {
+	map: Texture
+	marginalWeights: Texture
+	conditionalWeights: Texture
+
+	totalSumWhole: number
+	totalSumDecimal: number
+
+	size: Vector2
+
+	worker?: Worker | null
+
 	constructor() {
 		// Default to a white texture and associated weights so we don't
 		// just render black initially.
@@ -323,20 +371,28 @@ export class EquirectHdrInfoUniform {
 		this.map.dispose()
 	}
 
-	updateFrom(map) {
+	updateFrom(map: Texture) {
 		map = map.clone()
 		const { width, height, data } = map.image
 		const { type } = map
 
 		this.size.set(width, height)
 
-		return new Promise(resolve => {
+		return new Promise((resolve) => {
 			this.worker?.terminate()
 
 			this.worker = new Worker(workerUrl)
 
-			this.worker.postMessage({ width, height, isFloatType: type === FloatType, flipY: map.flipY, data })
-			this.worker.onmessage = ({ data: { data, totalSumValue, marginalDataArray, conditionalDataArray } }) => {
+			this.worker.postMessage({
+				width,
+				height,
+				isFloatType: type === FloatType,
+				flipY: map.flipY,
+				data,
+			})
+			this.worker.onmessage = ({
+				data: { data, totalSumValue, marginalDataArray, conditionalDataArray },
+			}) => {
 				this.dispose()
 
 				const { marginalWeights, conditionalWeights } = this

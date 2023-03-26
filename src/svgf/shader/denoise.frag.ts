@@ -1,4 +1,5 @@
-﻿varying vec2 vUv;
+﻿export default /* glsl */`
+varying vec2 vUv;
 
 uniform sampler2D depthTexture;
 uniform sampler2D normalTexture;
@@ -265,4 +266,4 @@ void main() {
     }
 
 #include <outputShader>
-}
+}`

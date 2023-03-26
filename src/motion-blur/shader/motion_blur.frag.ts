@@ -1,4 +1,5 @@
-﻿uniform sampler2D inputTexture;
+﻿export default /* glsl */ `
+uniform sampler2D inputTexture;
 uniform sampler2D velocityTexture;
 uniform sampler2D blueNoiseTexture;
 uniform ivec2 blueNoiseSize;
@@ -82,3 +83,4 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
 
     outputColor = vec4(motionBlurredColor, inputColor.a);
 }
+`.trim()

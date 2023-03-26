@@ -1,4 +1,6 @@
-﻿uniform sampler2D inputTexture;
+﻿export default /* glsl */ `
+
+uniform sampler2D inputTexture;
 uniform sampler2D sceneTexture;
 uniform sampler2D depthTexture;
 uniform int toneMapping;
@@ -43,3 +45,4 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
 
     outputColor = vec4(ssgiClr, 1.0);
 }
+`.trim()

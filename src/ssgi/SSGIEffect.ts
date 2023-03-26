@@ -1,28 +1,35 @@
-﻿/* eslint-disable camelcase */
-import { Effect, RenderPass, Selection } from "postprocessing"
-import {
-	LinearMipMapLinearFilter,
-	NoToneMapping,
-	PerspectiveCamera,
-	sRGBEncoding,
-	Uniform,
-	WebGLRenderTarget
-} from "three"
-import { SVGF } from "../svgf/SVGF.js"
-import { CubeToEquirectEnvPass } from "./pass/CubeToEquirectEnvPass.js"
-import { SSGIPass } from "./pass/SSGIPass.js"
-import compose from "./shader/compose.frag"
-import denoise_compose from "./shader/denoise_compose.frag"
-import denoise_compose_functions from "./shader/denoise_compose_functions.frag"
-import { defaultSSGIOptions } from "./SSGIOptions"
+﻿import type { Scene, WebGLRenderer, OrthographicCamera } from 'three'
+import type { SSGIOptions } from './SSGIOptions.js'
+import type { Pass } from 'postprocessing'
+
 import {
 	createGlobalDisableIblIradianceUniform,
 	createGlobalDisableIblRadianceUniform,
-	getMaxMipLevel,
-	getVisibleChildren,
 	isChildMaterialRenderable,
-	unrollLoops
-} from "./utils/Utils.js"
+	getVisibleChildren,
+	getMaxMipLevel,
+	unrollLoops,
+	objectKeys,
+} from './utils/Utils.js'
+
+import { Effect, RenderPass, Selection } from 'postprocessing'
+import {
+	LinearMipMapLinearFilter,
+	PerspectiveCamera,
+	WebGLRenderTarget,
+	NoToneMapping,
+	sRGBEncoding,
+	Uniform,
+} from 'three'
+
+import { defaultSSGIOptions } from './SSGIOptions.js'
+import { SSGIPass } from './pass/SSGIPass.js'
+import { SVGF } from '../svgf/SVGF.js'
+
+import denoise_compose_functions from './shader/denoise_compose_functions.frag'
+import { CubeToEquirectEnvPass } from './pass/CubeToEquirectEnvPass.js'
+import denoise_compose from './shader/denoise_compose.frag'
+import compose from './shader/compose.frag'
 
 const { render } = RenderPass.prototype
 
@@ -30,56 +37,72 @@ const globalIblIrradianceDisabledUniform = createGlobalDisableIblIradianceUnifor
 const globalIblRadianceDisabledUniform = createGlobalDisableIblRadianceUniform()
 
 export class SSGIEffect extends Effect {
+	static DefaultOptions = defaultSSGIOptions
+	svgf: SVGF
+
 	selection = new Selection()
 	isUsingRenderPass = true
+	ssgiPass: SSGIPass
+	lastSize: { width: any; height: any; resolutionScale: number }
+	sceneRenderTarget: WebGLRenderTarget
+	renderPass: RenderPass
+	cubeToEquirectEnvPass?: CubeToEquirectEnvPass
+
+	resolutionScale = 1
+	diffuseOnly = false
+	specularOnly = false
 
 	/**
-	 * @param {THREE.Scene} scene The scene of the SSGI effect
-	 * @param {THREE.Camera} camera The camera with which SSGI is being rendered
-	 * @param {velocityDepthNormalPass} velocityDepthNormalPass Required velocity pass
-	 * @param {SSGIOptions} [options] The optional options for the SSGI effect
+	 * @param _scene The scene of the SSGI effect
+	 * @param _camera The camera with which SSGI is being rendered
+	 * @param velocityDepthNormalPass Required velocity pass
+	 * @param [options] The optional options for the SSGI effect
 	 */
-	constructor(scene, camera, velocityDepthNormalPass, options = defaultSSGIOptions) {
+	constructor(
+		public _scene: Scene,
+		public _camera: PerspectiveCamera | OrthographicCamera,
+		velocityDepthNormalPass: Pass,
+		options: SSGIOptions,
+	) {
 		options = { ...defaultSSGIOptions, ...options }
 
-		super("SSGIEffect", compose, {
-			type: "FinalSSGIMaterial",
-			uniforms: new Map([
-				["inputTexture", new Uniform(null)],
-				["sceneTexture", new Uniform(null)],
-				["depthTexture", new Uniform(null)],
-				["toneMapping", new Uniform(NoToneMapping)]
-			])
+		super('SSGIEffect', compose, {
+			// @ts-expect-error - why is this even here?
+			type: 'FinalSSGIMaterial',
+			uniforms: new Map<string, Uniform>([
+				['inputTexture', new Uniform(null)],
+				['sceneTexture', new Uniform(null)],
+				['depthTexture', new Uniform(null)],
+				['toneMapping', new Uniform(NoToneMapping)],
+			]),
 		})
 
-		if (!(camera instanceof PerspectiveCamera)) {
+		if (!(_camera instanceof PerspectiveCamera)) {
 			throw new Error(
 				this.constructor.name +
 					" doesn't support cameras of type '" +
-					camera.constructor.name +
-					"' yet. Only cameras of type 'PerspectiveCamera' are supported."
+					_camera.constructor.name +
+					"' yet. Only cameras of type 'PerspectiveCamera' are supported.",
 			)
 		}
-
-		this._scene = scene
-		this._camera = camera
 
 		let definesName
 
 		if (options.diffuseOnly) {
-			definesName = "ssdgi"
+			definesName = 'ssdgi'
 			options.reprojectSpecular = false
 			options.roughnessDependent = false
 			options.basicVariance = 0.00025
 			options.neighborhoodClamping = false
 		} else if (options.specularOnly) {
-			definesName = "ssr"
+			definesName = 'ssr'
 			options.reprojectSpecular = true
 			options.roughnessDependent = true
 			options.basicVariance = 0.00025
 			options.neighborhoodClamping = true
 		} else {
-			definesName = "ssgi"
+			definesName = 'ssgi'
+			// todo - not this...
 			options.reprojectSpecular = [false, true]
 			options.neighborhoodClamping = [false, true]
 			options.roughnessDependent = [false, true]
@@ -89,31 +112,31 @@ export class SSGIEffect extends Effect {
 		const textureCount = options.diffuseOnly || options.specularOnly ? 1 : 2
 
 		this.svgf = new SVGF(
-			scene,
-			camera,
+			_scene,
+			_camera,
 			velocityDepthNormalPass,
 			textureCount,
 			denoise_compose,
 			denoise_compose_functions,
-			options
+			options,
 		)
 
-		if (definesName === "ssgi") {
+		if (definesName === 'ssgi') {
 			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.fragmentShader =
 				this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.fragmentShader.replace(
-					"accumulatedTexel[ 1 ].rgb = clampedColor;",
+					'accumulatedTexel[ 1 ].rgb = clampedColor;',
 					`
 						float roughness = inputTexel[ 0 ].a;
 						accumulatedTexel[ 1 ].rgb = mix(accumulatedTexel[ 1 ].rgb, clampedColor, 1. - sqrt(roughness));
-						`
+						`,
 				)
-		} else if (definesName === "ssr") {
+		} else if (definesName === 'ssr') {
 			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.fragmentShader =
 				this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.fragmentShader.replace(
-					"accumulatedTexel[ 0 ].rgb = clampedColor;",
+					'accumulatedTexel[ 0 ].rgb = clampedColor;',
 					`
 					accumulatedTexel[ 0 ].rgb = mix(accumulatedTexel[ 0 ].rgb, clampedColor, 0.5);
-					`
+					`,
 				)
 		}
 
@@ -123,12 +146,14 @@ export class SSGIEffect extends Effect {
 		this.ssgiPass = new SSGIPass(this, options)
 
 		if (options.diffuseOnly) {
-			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture0.value = this.ssgiPass.texture
+			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture0.value =
+				this.ssgiPass.texture
 		} else if (options.specularOnly) {
 			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture0.value =
 				this.ssgiPass.specularTexture
 		} else {
-			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture0.value = this.ssgiPass.texture
+			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture0.value =
+				this.ssgiPass.texture
 			this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms.inputTexture1.value =
 				this.ssgiPass.specularTexture
 		}
@@ -140,22 +165,23 @@ export class SSGIEffect extends Effect {
 			...this.svgf.denoisePass.fullscreenMaterial.uniforms,
 			...{
 				diffuseTexture: new Uniform(null),
-				directLightTexture: new Uniform(null)
-			}
+				directLightTexture: new Uniform(null),
+			},
 		}
 
-		this.svgf.denoisePass.fullscreenMaterial.defines[definesName] = ""
+		this.svgf.denoisePass.fullscreenMaterial.defines[definesName] = ''
 
-		this.svgf.denoisePass.fullscreenMaterial.uniforms.diffuseTexture.value = this.ssgiPass.diffuseTexture
+		this.svgf.denoisePass.fullscreenMaterial.uniforms.diffuseTexture.value =
+			this.ssgiPass.diffuseTexture
 
 		this.lastSize = {
 			width: options.width,
 			height: options.height,
-			resolutionScale: options.resolutionScale
+			resolutionScale: options.resolutionScale,
 		}
 
 		this.sceneRenderTarget = new WebGLRenderTarget(1, 1, {
-			encoding: sRGBEncoding
+			encoding: sRGBEncoding,
 		})
 
 		this.renderPass = new RenderPass(this._scene, this._camera)
@@ -182,8 +208,8 @@ export class SSGIEffect extends Effect {
 
 	updateUsingRenderPass() {
 		if (this.isUsingRenderPass) {
-			this.ssgiPass.fullscreenMaterial.defines.useDirectLight = ""
-			this.svgf.denoisePass.fullscreenMaterial.defines.useDirectLight = ""
+			this.ssgiPass.fullscreenMaterial.defines.useDirectLight = ''
+			this.svgf.denoisePass.fullscreenMaterial.defines.useDirectLight = ''
 		} else {
 			delete this.ssgiPass.fullscreenMaterial.defines.useDirectLight
 			delete this.svgf.denoisePass.fullscreenMaterial.defines.useDirectLight
@@ -193,14 +219,16 @@ export class SSGIEffect extends Effect {
 		this.svgf.denoisePass.fullscreenMaterial.needsUpdate = true
 	}
 
-	makeOptionsReactive(options) {
+	makeOptionsReactive(options: SSGIOptions) {
 		let needsUpdate = false
 
 		const ssgiPassFullscreenMaterialUniforms = this.ssgiPass.fullscreenMaterial.uniforms
-		const ssgiPassFullscreenMaterialUniformsKeys = Object.keys(ssgiPassFullscreenMaterialUniforms)
+		const ssgiPassFullscreenMaterialUniformsKeys = Object.keys(
+			ssgiPassFullscreenMaterialUniforms,
+		)
 		const temporalReprojectPass = this.svgf.svgfTemporalReprojectPass
 
-		for (const key of Object.keys(options)) {
+		for (const key of objectKeys(options)) {
 			Object.defineProperty(this, key, {
 				get() {
 					return options[key]
@@ -208,47 +236,48 @@ export class SSGIEffect extends Effect {
 				set(value) {
 					if (options[key] === value && needsUpdate) return
 
+					// @ts-expect-error
 					options[key] = value
 
 					switch (key) {
 						// denoiser
-						case "denoiseIterations":
+						case 'denoiseIterations':
 							this.svgf.denoisePass.iterations = value
 							break
 
-						case "denoiseDiffuse":
-							this.svgf.denoisePass.fullscreenMaterial.uniforms.denoise.value[0] = value
+						case 'denoiseDiffuse':
+							this.svgf.denoisePass.fullscreenMaterial.uniforms.denoise.value[0] =
+								value
 							break
 
-						case "denoiseSpecular":
-							this.svgf.denoisePass.fullscreenMaterial.uniforms.denoise.value[1] = value
+						case 'denoiseSpecular':
+							this.svgf.denoisePass.fullscreenMaterial.uniforms.denoise.value[1] =
+								value
 							break
 
-						case "denoiseKernel":
-						case "depthPhi":
-						case "normalPhi":
-						case "roughnessPhi":
+						case 'denoiseKernel':
+						case 'depthPhi':
+						case 'normalPhi':
+						case 'roughnessPhi':
 							this.svgf.denoisePass.fullscreenMaterial.uniforms[key].value = value
 							break
 
 						// SSGI
-						case "resolutionScale":
+						case 'resolutionScale':
 							this.setSize(this.lastSize.width, this.lastSize.height)
 							temporalReprojectPass.reset()
 							break
 
 						// defines
-						case "spp":
-							this.ssgiPass.fullscreenMaterial.fragmentShader = this.ssgiPass.defaultFragmentShader.replaceAll(
-								"spp",
-								value
-							)
+						case 'spp':
+							this.ssgiPass.fullscreenMaterial.fragmentShader =
+								this.ssgiPass.defaultFragmentShader.replaceAll('spp', value)
 
 							if (value !== 1) {
 								this.ssgiPass.fullscreenMaterial.fragmentShader = unrollLoops(
 									this.ssgiPass.fullscreenMaterial.fragmentShader
-										.replace("#pragma unroll_loop_start", "")
-										.replace("#pragma unroll_loop_end", "")
+										.replace('#pragma unroll_loop_start', '')
+										.replace('#pragma unroll_loop_end', ''),
 								)
 							}
 
@@ -256,25 +285,25 @@ export class SSGIEffect extends Effect {
 
 							temporalReprojectPass.reset()
 							break
-						case "steps":
-						case "refineSteps":
+						case 'steps':
+						case 'refineSteps':
 							this.ssgiPass.fullscreenMaterial.defines[key] = parseInt(value)
 							this.ssgiPass.fullscreenMaterial.needsUpdate = needsUpdate
 							temporalReprojectPass.reset()
 
 							break
 
-						case "directLightMultiplier":
+						case 'directLightMultiplier':
 							this.ssgiPass.fullscreenMaterial.defines[key] = value.toPrecision(5)
 							this.ssgiPass.fullscreenMaterial.needsUpdate = needsUpdate
 							temporalReprojectPass.reset()
 							break
 
-						case "importanceSampling":
-						case "missedRays":
-						case "autoThickness":
+						case 'importanceSampling':
+						case 'missedRays':
+						case 'autoThickness':
 							if (value) {
-								this.ssgiPass.fullscreenMaterial.defines[key] = ""
+								this.ssgiPass.fullscreenMaterial.defines[key] = ''
 							} else {
 								delete this.ssgiPass.fullscreenMaterial.defines[key]
 							}
@@ -284,12 +313,14 @@ export class SSGIEffect extends Effect {
 
 							break
 
-						case "blend":
-							this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms[key].value = value
+						case 'blend':
+							this.svgf.svgfTemporalReprojectPass.fullscreenMaterial.uniforms[
+								key
+							].value = value
 							temporalReprojectPass.reset()
 							break
 
-						case "distance":
+						case 'distance':
 							ssgiPassFullscreenMaterialUniforms.rayDistance.value = value
 							temporalReprojectPass.reset()
 
@@ -302,9 +333,10 @@ export class SSGIEffect extends Effect {
 								temporalReprojectPass.reset()
 							}
 					}
-				}
+				},
 			})
 
+			// @ts-expect-error
 			// apply all uniforms and defines
 			this[key] = options[key]
 		}
@@ -312,12 +344,12 @@ export class SSGIEffect extends Effect {
 		needsUpdate = true
 	}
 
-	initialize(renderer, ...args) {
+	initialize(renderer: WebGLRenderer, ...args: [alpha: boolean, frameBufferType: number]) {
 		super.initialize(renderer, ...args)
 		this.ssgiPass.initialize(renderer, ...args)
 	}
 
-	setSize(width, height, force = false) {
+	setSize(width: number, height: number, force = false) {
 		if (width === undefined && height === undefined) return
 		if (
 			!force &&
@@ -335,7 +367,7 @@ export class SSGIEffect extends Effect {
 		this.lastSize = {
 			width,
 			height,
-			resolutionScale: this.resolutionScale
+			resolutionScale: this.resolutionScale,
 		}
 	}
 
@@ -349,7 +381,7 @@ export class SSGIEffect extends Effect {
 		RenderPass.prototype.render = render
 	}
 
-	keepEnvMapUpdated(renderer) {
+	keepEnvMapUpdated(renderer: WebGLRenderer) {
 		const ssgiMaterial = this.ssgiPass.fullscreenMaterial
 
 		let environment = this._scene.environment
@@ -357,10 +389,14 @@ export class SSGIEffect extends Effect {
 		if (environment) {
 			if (ssgiMaterial.uniforms.envMapInfo.value.mapUuid !== environment.uuid) {
 				// if the environment is a cube texture, convert it to an equirectangular texture so we can sample it in the SSGI pass and use MIS
-				if (environment.isCubeTexture) {
-					if (!this.cubeToEquirectEnvPass) this.cubeToEquirectEnvPass = new CubeToEquirectEnvPass()
+				if ('isCubeTexture' in environment) {
+					if (!this.cubeToEquirectEnvPass)
+						this.cubeToEquirectEnvPass = new CubeToEquirectEnvPass()
 
-					environment = this.cubeToEquirectEnvPass.generateEquirectEnvMap(renderer, environment)
+					environment = this.cubeToEquirectEnvPass.generateEquirectEnvMap(
+						renderer,
+						environment,
+					)
 					environment.uuid = this._scene.environment.uuid
 				}
 
@@ -378,14 +414,16 @@ export class SSGIEffect extends Effect {
 
 				ssgiMaterial.uniforms.envMapInfo.value.map = environment
 
-				ssgiMaterial.defines.USE_ENVMAP = ""
+				ssgiMaterial.defines.USE_ENVMAP = ''
 				delete ssgiMaterial.defines.importanceSampling
 
 				if (this.importanceSampling) {
-					ssgiMaterial.uniforms.envMapInfo.value.updateFrom(environment, renderer).then(() => {
-						ssgiMaterial.defines.importanceSampling = ""
-						ssgiMaterial.needsUpdate = true
-					})
+					ssgiMaterial.uniforms.envMapInfo.value
+						.updateFrom(environment, renderer)
+						.then(() => {
+							ssgiMaterial.defines.importanceSampling = ''
+							ssgiMaterial.needsUpdate = true
+						})
 				} else {
 					ssgiMaterial.uniforms.envMapInfo.value.map = environment
 				}
@@ -394,7 +432,7 @@ export class SSGIEffect extends Effect {
 
 				ssgiMaterial.needsUpdate = true
 			}
-		} else if ("USE_ENVMAP" in ssgiMaterial.defines) {
+		} else if ('USE_ENVMAP' in ssgiMaterial.defines) {
 			delete ssgiMaterial.defines.USE_ENVMAP
 			delete ssgiMaterial.defines.importanceSampling
 
@@ -402,7 +440,7 @@ export class SSGIEffect extends Effect {
 		}
 	}
 
-	update(renderer, inputBuffer) {
+	update(renderer: WebGLRenderer, inputBuffer: WebGLRenderTarget) {
 		this.keepEnvMapUpdated(renderer)
 
 		const sceneBuffer = this.isUsingRenderPass ? inputBuffer : this.sceneRenderTarget
@@ -413,29 +451,32 @@ export class SSGIEffect extends Effect {
 			const children = []
 
 			for (const c of getVisibleChildren(this._scene)) {
-				if (c.isScene) return
+				if ('isScene' in c) return
 
 				c.visible = !isChildMaterialRenderable(c)
 
 				c.visible ? hideMeshes.push(c) : children.push(c)
 			}
 
-			this.renderPass.render(renderer, this.sceneRenderTarget)
+			// todo - Figure out why the output buffer was missing.
+			// this.renderPass.render(renderer, this.sceneRenderTarget)
+			this.renderPass.render(renderer, this.sceneRenderTarget, sceneBuffer)
 
 			for (const c of children) c.visible = true
 			for (const c of hideMeshes) c.visible = false
 		}
 
 		this.ssgiPass.fullscreenMaterial.uniforms.directLightTexture.value = sceneBuffer.texture
-		this.svgf.denoisePass.fullscreenMaterial.uniforms.directLightTexture.value = sceneBuffer.texture
+		this.svgf.denoisePass.fullscreenMaterial.uniforms.directLightTexture.value =
+			sceneBuffer.texture
 
 		this.ssgiPass.render(renderer)
 		this.svgf.render(renderer)
 
-		this.uniforms.get("inputTexture").value = this.svgf.texture
-		this.uniforms.get("sceneTexture").value = sceneBuffer.texture
-		this.uniforms.get("depthTexture").value = this.ssgiPass.depthTexture
-		this.uniforms.get("toneMapping").value = renderer.toneMapping
+		this.uniforms.get('inputTexture')!.value = this.svgf.texture
+		this.uniforms.get('sceneTexture')!.value = sceneBuffer.texture
+		this.uniforms.get('depthTexture')!.value = this.ssgiPass.depthTexture
+		this.uniforms.get('toneMapping')!.value = renderer.toneMapping
 
 		for (const c of hideMeshes) c.visible = true
 
@@ -461,6 +502,16 @@ export class SSGIEffect extends Effect {
 			if (wasUsingRenderPass != this.isUsingRenderPass) this.updateUsingRenderPass()
 		})
 	}
+	rAF2 = 0
+	rAF = 0
+	usingRenderPassRAF = 0
+	// rAF2(_rAF2: any) {
+	// 	throw new Error('Method not implemented.')
+	// }
+	// rAF(_rAF: any) {
+	// 	throw new Error('Method not implemented.')
+	// }
+	// usingRenderPassRAF(_usingRenderPassRAF: any) {
+	// 	throw new Error('Method not implemented.')
+	// }
 }
-
-SSGIEffect.DefaultOptions = defaultSSGIOptions

@@ -1,0 +1,43 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"types": ["node", "vite/client"],
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"noImplicitAny": true,
+		"noUnusedLocals": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"noImplicitReturns": true,
+		"noUnusedParameters": true,
+		"verbatimModuleSyntax": true,
+		"useDefineForClassFields": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowUnreachableCode": false,
+		"strictNullChecks": true,
+		"allowJs": true,
+		"checkJs": true,
+	},
+	"typedocOptions": {
+		"entryPoints": [
+			"./packages/core/index.ts",
+			"./packages/gui/index.ts",
+			"./packages/stage/index.ts",
+			"./packages/post-stack/index.ts"
+		],
+		"out": "./docs",
+		"theme": "default",
+		"readme": "none",
+		"hideGenerator": true,
+		"includeVersion": true,
+		"excludePrivate": false,
+		"excludeInternal": false,
+		"treatWarningsAsErrors": true
+	},
+	"include": ["src"],
+}

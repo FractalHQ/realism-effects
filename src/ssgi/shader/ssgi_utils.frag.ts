@@ -1,4 +1,6 @@
-﻿#define PI           M_PI
+﻿export default /* glsl */ `
+
+#define PI           M_PI
 
 #define luminance(a) dot(vec3(0.2125, 0.7154, 0.0721), a)
 
@@ -297,3 +299,4 @@ float getCurvature(const vec3 n, const float depth) {
 
     return curvature;
 }
+`.trim()

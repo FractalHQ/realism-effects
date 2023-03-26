@@ -1,3 +1,5 @@
+export default /* glsl */ `
+
 vec3 viewNormal = normalize((vec4(normal, 1.) * cameraMatrixWorld).xyz);
 
 roughness *= roughness;
@@ -75,3 +77,4 @@ denoisedColor[0] = specularComponent;
 #ifdef useDirectLight
 denoisedColor[0] += directLight;
 #endif
+`.trim()

@@ -1,4 +1,4 @@
-uniform sampler2D diffuseTexture;
+export default /* glsl */ `uniform sampler2D diffuseTexture;
 uniform sampler2D directLightTexture;
 
 // source: https://github.com/mrdoob/three.js/blob/dev/examples/js/shaders/SSAOShader.js
@@ -45,3 +45,4 @@ vec3 ToLocal(const vec3 X, const vec3 Y, const vec3 Z, const vec3 V) {
 vec3 ToWorld(const vec3 X, const vec3 Y, const vec3 Z, const vec3 V) {
     return V.x * X + V.y * Y + V.z * Z;
 }
+`

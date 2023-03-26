@@ -1,0 +1,22 @@
+{
+	"svelteSortOrder": "options-scripts-markup-styles",
+	"htmlWhitespaceSensitivity": "ignore",
+	"trailingComma": "all",
+	"singleQuote": true,
+	"printWidth": 100,
+	"useTabs": true,
+	"tabWidth": 4,
+	"semi": false,
+	"overrides": [
+		{
+			"files": [
+				"*.frag",
+				"*.vert",
+				"*.glsl"
+			],
+			"options": {
+				"parser": "glsl-parser"
+			}
+		}
+	]
+}
