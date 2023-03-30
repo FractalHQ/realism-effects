@@ -16,8 +16,13 @@ export class MRTMaterial extends ShaderMaterial {
 	normalScale: Vector2
 	constructor() {
 		super({
-			// @ts-expect-error ??
-			type: 'MRTMaterial',
+			/**
+			 * @remarks
+			 * `type` isn't a valid option according to Typescript. I checked,
+			 * and it's right (it isn't read from `params` and is set to `ShaderMaterial`).
+			 * I added it below the super call so that it actually gets set.
+			 */
+			// type: 'MRTMaterial',
 
 			defines: {
 				USE_UV: '',
@@ -245,6 +250,8 @@ export class MRTMaterial extends ShaderMaterial {
 			fog: false,
 			lights: false,
 		})
+
+		this.type = 'MRTMaterial'
 
 		this.normalMapType = TangentSpaceNormalMap
 		this.normalScale = new Vector2(1, 1)
