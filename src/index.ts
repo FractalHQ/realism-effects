@@ -1,4 +1,6 @@
-﻿export { VelocityDepthNormalPass } from "./temporal-reproject/pass/VelocityDepthNormalPass.js"
+﻿export type { SSGIOptions } from "./ssgi/SSGIOptions.js"
+
+export { VelocityDepthNormalPass } from "./temporal-reproject/pass/VelocityDepthNormalPass.js"
 export { TemporalReprojectPass } from "./temporal-reproject/TemporalReprojectPass.js"
 export { VelocityPass } from "./temporal-reproject/pass/VelocityPass.js"
 export { MotionBlurEffect } from "./motion-blur/MotionBlurEffect.js"
