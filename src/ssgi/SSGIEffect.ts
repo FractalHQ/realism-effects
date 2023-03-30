@@ -38,6 +38,7 @@ const globalIblRadianceDisabledUniform = createGlobalDisableIblRadianceUniform()
 
 export class SSGIEffect extends Effect {
 	static DefaultOptions = defaultSSGIOptions
+	type = 'FinalSSGIMaterial'
 	svgf: SVGF
 
 	selection = new Selection()
@@ -51,6 +52,7 @@ export class SSGIEffect extends Effect {
 	resolutionScale = 1
 	diffuseOnly = false
 	specularOnly = false
+	importanceSampling?: boolean
 
 	/**
 	 * @param _scene The scene of the SSGI effect
@@ -67,8 +69,6 @@ export class SSGIEffect extends Effect {
 		options = { ...defaultSSGIOptions, ...options }
 
 		super('SSGIEffect', compose, {
-			// @ts-expect-error - why is this even here?
-			type: 'FinalSSGIMaterial',
 			uniforms: new Map<string, Uniform>([
 				['inputTexture', new Uniform(null)],
 				['sceneTexture', new Uniform(null)],
@@ -102,10 +102,14 @@ export class SSGIEffect extends Effect {
 			options.neighborhoodClamping = true
 		} else {
 			definesName = 'ssgi'
-			// todo - not this...
+			// todo: not this...
+			// @ts-expect-error .
 			options.reprojectSpecular = [false, true]
+			// @ts-expect-error .
 			options.neighborhoodClamping = [false, true]
+			// @ts-expect-error .
 			options.roughnessDependent = [false, true]
+			// @ts-expect-error .
 			options.basicVariance = [0.00025, 0.00025]
 		}
 
@@ -177,7 +181,7 @@ export class SSGIEffect extends Effect {
 		this.lastSize = {
 			width: options.width,
 			height: options.height,
-			resolutionScale: options.resolutionScale,
+			resolutionScale: options.resolutionScale ?? 1,
 		}
 
 		this.sceneRenderTarget = new WebGLRenderTarget(1, 1, {
@@ -187,7 +191,7 @@ export class SSGIEffect extends Effect {
 		this.renderPass = new RenderPass(this._scene, this._camera)
 		this.renderPass.renderToScreen = false
 
-		this.setSize(options.width, options.height)
+		this.setSize(options.width ?? window.innerWidth, options.height ?? window.innerHeight)
 
 		const th = this
 		const ssgiRenderPass = this.renderPass
@@ -236,7 +240,6 @@ export class SSGIEffect extends Effect {
 				set(value) {
 					if (options[key] === value && needsUpdate) return
 
-					// @ts-expect-error
 					options[key] = value
 
 					switch (key) {
@@ -397,7 +400,7 @@ export class SSGIEffect extends Effect {
 						renderer,
 						environment,
 					)
-					environment.uuid = this._scene.environment.uuid
+					environment.uuid = this._scene.environment?.uuid ?? 'error'
 				}
 
 				if (!environment.generateMipmaps) {
@@ -458,9 +461,9 @@ export class SSGIEffect extends Effect {
 				c.visible ? hideMeshes.push(c) : children.push(c)
 			}
 
-			// todo - Figure out why the output buffer was missing.
-			// this.renderPass.render(renderer, this.sceneRenderTarget)
-			this.renderPass.render(renderer, this.sceneRenderTarget, sceneBuffer)
+			// @ts-expect-error // todo: Figure out why the output buffer is missing.
+			this.renderPass.render(renderer, this.sceneRenderTarget)
+			// this.renderPass.render(renderer, this.sceneRenderTarget, sceneBuffer)
 
 			for (const c of children) c.visible = true
 			for (const c of hideMeshes) c.visible = false
@@ -495,6 +498,7 @@ export class SSGIEffect extends Effect {
 				globalIblRadianceDisabledUniform.value = false
 			})
 		})
+
 		this.usingRenderPassRAF = requestAnimationFrame(() => {
 			const wasUsingRenderPass = this.isUsingRenderPass
 			this.isUsingRenderPass = false
