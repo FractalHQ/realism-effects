@@ -9,7 +9,7 @@
 } from 'three'
 import type { SSGIMaterial } from '../material/SSGIMaterial.js'
 
-import { GroundProjectedEnv } from 'three/examples/jsm/objects/GroundProjectedEnv.js'
+import { GroundProjectedSkybox } from 'three/examples/jsm/objects/GroundProjectedSkybox.js'
 import {
 	DataTexture,
 	FloatType,
@@ -286,8 +286,8 @@ export const splitIntoGroupsOfVector4 = (arr: []) => {
 	return result
 }
 
-export const isGroundProjectedEnv = (c: any): c is GroundProjectedEnv => {
-	return c instanceof GroundProjectedEnv
+export const isGroundProjectedSkybox = (c: any): c is GroundProjectedSkybox => {
+	return c instanceof GroundProjectedSkybox
 }
 
 export const isChildMaterialRenderable = (c: Mesh, material = c.material) => {
@@ -297,7 +297,7 @@ export const isChildMaterialRenderable = (c: Mesh, material = c.material) => {
 		material.depthWrite &&
 		material.depthTest &&
 		(!material.transparent || material.opacity > 0) &&
-		!isGroundProjectedEnv(c)
+		!isGroundProjectedSkybox(c)
 	)
 }
 

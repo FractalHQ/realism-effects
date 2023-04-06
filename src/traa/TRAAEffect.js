@@ -1,6 +1,6 @@
 ﻿import { Effect } from "postprocessing"
 import { Uniform } from "three"
-import { getVisibleChildren, isGroundProjectedEnv } from "../ssgi/utils/Utils"
+import { getVisibleChildren, isGroundProjectedSkybox } from "../ssgi/utils/Utils"
 import { TemporalReprojectPass } from "../temporal-reproject/TemporalReprojectPass.js"
 import compose from "./shader/compose.frag"
 
@@ -50,7 +50,7 @@ export class TRAAEffect extends Effect {
 
 		this._camera.projectionMatrix.copy(this.unjitteredProjectionMatrix)
 
-		const noJitterMeshes = getVisibleChildren(this._scene).filter(c => isGroundProjectedEnv(c))
+		const noJitterMeshes = getVisibleChildren(this._scene).filter(c => isGroundProjectedSkybox(c))
 
 		for (const mesh of noJitterMeshes) {
 			const renderData = renderer.properties.get(mesh.material)
